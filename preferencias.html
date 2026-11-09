@@ -9,12 +9,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <script>
-        // Configuración de Firebase (obtenida de viaje.html)
+        // Configuración de Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyCDvgv6A8ugOmfgX9jKiCp_0ccyomxYOk0",
             authDomain: "rutas-e051f.firebaseapp.com",
-            databaseURL: "https://rutas-e051f-default-rtdb.europe-west1.firebasedatabase.app",
+            databaseURL: "https://compras-58fd2-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "rutas-e051f",
             storageBucket: "rutas-e051f.firebasestorage.app",
             messagingSenderId: "263100723365",
@@ -25,6 +26,7 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const storage = firebase.storage();
+        const database = firebase.database();
 
         // Autenticación anónima
         auth.signInAnonymously().catch((error) => {
@@ -392,8 +394,7 @@
         }
 
         function showDetails(id) {
-            const items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
-            const item = items.find(i => i.id === id);
+            const item = window.currentItems ? window.currentItems.find(i => i.id == id) : null;
             if (!item) return;
 
             const modal = document.getElementById('itemModal');
@@ -412,8 +413,7 @@
         }
 
         function prepareEdit(id) {
-            const items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
-            const item = items.find(i => i.id === id);
+            const item = window.currentItems ? window.currentItems.find(i => i.id == id) : null;
             if (!item) return;
 
             document.getElementById('editId').value = item.id;
@@ -484,7 +484,43 @@
             }
         });
 
-        // Cargar items del localStorage al iniciar
+        // Cargar items de Firebase Realtime Database
+        function loadItems() {
+            database.ref('items').on('value', (snapshot) => {
+                const data = snapshot.val();
+                const items = [];
+                for (let key in data) {
+                    items.push({ ...data[key], firebaseKey: key });
+                }
+                window.currentItems = items;
+                renderGrid(items);
+            });
+        }
+
+        function renderGrid(items) {
+            itemsGrid.innerHTML = '';
+            [...items].reverse().forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => showDetails(item.id);
+                card.innerHTML = `
+                    <img src="${item.image}" alt="${item.name}">
+                    <div class="card-content">
+                        <h3 class="card-title">${item.name}</h3>
+                        <div class="card-location">📍 <strong>Lugar:</strong> ${item.location}</div>
+                        <div class="card-observations">${item.observations}</div>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteItem(${item.id})">Eliminar</button>
+                    </div>
+                `;
+                itemsGrid.appendChild(card);
+            });
+
+            if (items.length === 0) {
+                itemsGrid.innerHTML = '<p>Aún no has guardado nada.</p>';
+            }
+        }
+
+        // Cargar items al iniciar
         document.addEventListener('DOMContentLoaded', loadItems);
 
         // Manejar el envío del formulario
@@ -539,13 +575,12 @@
                 };
 
                 if (editId) {
-                    updateItem(itemData);
+                    await updateItem(itemData);
                 } else {
-                    saveItem(itemData);
+                    await saveItem(itemData);
                 }
 
                 resetForm();
-                loadItems();
                 alert(editId ? '¡Actualizado con éxito!' : '¡Guardado con éxito!');
                 openTab('galeria');
                 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -560,62 +595,33 @@
             }
         });
 
-        function saveItem(item) {
-            let items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
-            items.push(item);
-            localStorage.setItem('myFavoriteItems', JSON.stringify(items));
+        async function saveItem(item) {
+            await database.ref('items').push(item);
         }
 
-        function updateItem(updatedItem) {
-            let items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
-            const index = items.findIndex(i => i.id === updatedItem.id);
-            if (index !== -1) {
-                items[index] = updatedItem;
-                localStorage.setItem('myFavoriteItems', JSON.stringify(items));
-            }
-        }
-
-        function loadItems() {
-            const items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
-            itemsGrid.innerHTML = '';
-
-            items.reverse().forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.onclick = () => showDetails(item.id);
-                card.innerHTML = `
-                    <img src="${item.image}" alt="${item.name}">
-                    <div class="card-content">
-                        <h3 class="card-title">${item.name}</h3>
-                        <div class="card-location">📍 <strong>Lugar:</strong> ${item.location}</div>
-                        <div class="card-observations">${item.observations}</div>
-                        <button class="delete-btn" onclick="event.stopPropagation(); deleteItem(${item.id})">Eliminar</button>
-                    </div>
-                `;
-                itemsGrid.appendChild(card);
-            });
-
-            if (items.length === 0) {
-                itemsGrid.innerHTML = '<p>Aún no has guardado nada.</p>';
+        async function updateItem(updatedItem) {
+            const item = window.currentItems.find(i => i.id === updatedItem.id);
+            if (item && item.firebaseKey) {
+                await database.ref('items/' + item.firebaseKey).set(updatedItem);
             }
         }
 
         window.deleteItem = async function (id) {
             if (confirm('¿Estás seguro de que quieres eliminar este recuerdo?')) {
-                let items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
-                const item = items.find(i => i.id === id);
+                const item = window.currentItems.find(i => i.id === id);
 
-                if (item && item.storagePath) {
-                    try {
-                        await storage.ref().child(item.storagePath).delete();
-                    } catch (e) {
-                        console.warn("No se pudo borrar la imagen de Storage:", e);
+                if (item) {
+                    if (item.storagePath) {
+                        try {
+                            await storage.ref().child(item.storagePath).delete();
+                        } catch (e) {
+                            console.warn("No se pudo borrar la imagen de Storage:", e);
+                        }
+                    }
+                    if (item.firebaseKey) {
+                        await database.ref('items/' + item.firebaseKey).remove();
                     }
                 }
-
-                items = items.filter(item => item.id !== id);
-                localStorage.setItem('myFavoriteItems', JSON.stringify(items));
-                loadItems();
             }
         }
     </script>
