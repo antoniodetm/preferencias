@@ -160,12 +160,151 @@
             background-color: #c0392b;
         }
 
+        .edit-btn {
+            background-color: #2ecc71;
+            margin-top: 10px;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .edit-btn:hover {
+            background-color: #27ae60;
+        }
+
         .preview-image {
             max-width: 100px;
             max-height: 100px;
             margin-top: 10px;
             display: none;
             border-radius: 4px;
+        }
+
+        /* Estilos para pestañas */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Estilos para el Modal de detalles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 600px;
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            right: 20px;
+            top: 10px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .modal img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .card {
+            cursor: pointer;
+        }
+
+        .card-content {
+            display: none;
+            /* Ocultar detalles en la rejilla */
+        }
+
+        /* Media Queries para Móviles */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                width: 100%;
+            }
+
+            header h1 {
+                font-size: 1.5em;
+            }
+
+            .items-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 10px;
+            }
+
+            .card img {
+                height: 140px;
+            }
+
+            .modal-content {
+                margin: 0;
+                width: 100%;
+                min-height: 100%;
+                border-radius: 0;
+                box-sizing: border-box;
+                padding-top: 50px;
+            }
+
+            .tab-btn {
+                padding: 10px 10px;
+                font-size: 1em;
+                flex: 1;
+                text-align: center;
+            }
+
+            .form-container {
+                padding: 15px;
+            }
+
+            button {
+                width: 100%;
+                padding: 12px;
+            }
         }
     </style>
 </head>
@@ -178,31 +317,45 @@
             <p>Guarda fotos de las cosas que te gustan y dónde encontrarlas.</p>
         </header>
 
-        <section class="form-container">
-            <h2>Añadir Nuevo Item</h2>
-            <form id="itemForm">
-                <div class="form-group">
-                    <label for="photo">Foto:</label>
-                    <input type="file" id="photo" accept="image/*" required>
-                    <img id="preview" class="preview-image" src="" alt="Previsualización">
-                </div>
-                <div class="form-group">
-                    <label for="name">¿Qué es?</label>
-                    <input type="text" id="name" placeholder="Ej: Lámpara vintage" required>
-                </div>
-                <div class="form-group">
-                    <label for="location">¿Dónde lo compraste / viste?</label>
-                    <input type="text" id="location" placeholder="Ej: Tienda de muebles de la esquina" required>
-                </div>
-                <div class="form-group">
-                    <label for="observations">Observaciones:</label>
-                    <textarea id="observations" placeholder="Cualquier detalle adicional..."></textarea>
-                </div>
-                <button type="submit">Guardar</button>
-            </form>
+        <nav class="tabs">
+            <button class="tab-btn active" onclick="openTab('galeria')">Galería</button>
+            <button class="tab-btn" onclick="openTab('nuevo-item')">Nuevo Item</button>
+        </nav>
+
+        <section id="nuevo-item" class="tab-content">
+            <div class="form-container">
+                <h2 id="formTitle">Añadir Nuevo Item</h2>
+                <form id="itemForm">
+                    <input type="hidden" id="editId">
+                    <div class="form-group">
+                        <label for="photo">Foto:</label>
+                        <input type="file" id="photo" accept="image/*">
+                        <img id="preview" class="preview-image" src="" alt="Previsualización">
+                        <input type="hidden" id="currentImageUrl">
+                        <input type="hidden" id="currentStoragePath">
+                    </div>
+                    <div class="form-group">
+                        <label for="name">¿Qué es?</label>
+                        <input type="text" id="name" placeholder="Ej: Lámpara vintage" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="location">¿Dónde lo compraste / viste?</label>
+                        <input type="text" id="location" placeholder="Ej: Tienda de muebles de la esquina" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="observations">Observaciones:</label>
+                        <textarea id="observations" placeholder="Cualquier detalle adicional..."></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" id="submitBtn">Guardar</button>
+                        <button type="button" id="cancelEditBtn" style="display:none; background-color: #95a5a6;"
+                            onclick="resetForm()">Cancelar</button>
+                    </div>
+                </form>
+            </div>
         </section>
 
-        <section>
+        <section id="galeria" class="tab-content active">
             <h2>Mi Galería</h2>
             <div id="itemsGrid" class="items-grid">
                 <!-- Los items se cargarán aquí -->
@@ -210,7 +363,109 @@
         </section>
     </div>
 
+    <!-- Modal para ver detalles -->
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <div id="modalBody">
+                <!-- El contenido se generará dinámicamente -->
+            </div>
+        </div>
+    </div>
+
     <script>
+        function openTab(tabId) {
+            // Ocultar todos los contenidos
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            // Desactivar todos los botones
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            // Mostrar el contenido seleccionado
+            document.getElementById(tabId).classList.add('active');
+            // Activar el botón correspondiente
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
+        }
+
+        function showDetails(id) {
+            const items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
+            const item = items.find(i => i.id === id);
+            if (!item) return;
+
+            const modal = document.getElementById('itemModal');
+            const modalBody = document.getElementById('modalBody');
+
+            modalBody.innerHTML = `
+                <img src="${item.image}" alt="${item.name}">
+                <h3 class="card-title">${item.name}</h3>
+                <div class="card-location">📍 <strong>Lugar:</strong> ${item.location}</div>
+                <div class="card-observations">${item.observations}</div>
+                <button class="edit-btn" onclick="prepareEdit(${item.id})">Editar</button>
+                <button class="delete-btn" onclick="deleteItem(${item.id}); closeModal();">Eliminar</button>
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        function prepareEdit(id) {
+            const items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
+            const item = items.find(i => i.id === id);
+            if (!item) return;
+
+            document.getElementById('editId').value = item.id;
+            document.getElementById('name').value = item.name;
+            document.getElementById('location').value = item.location;
+            document.getElementById('observations').value = item.observations;
+            document.getElementById('currentImageUrl').value = item.image;
+            document.getElementById('currentStoragePath').value = item.storagePath;
+
+            const preview = document.getElementById('preview');
+            preview.src = item.image;
+            preview.style.display = 'block';
+
+            document.getElementById('formTitle').innerText = 'Editar Item';
+            document.getElementById('submitBtn').innerText = 'Actualizar';
+            document.getElementById('cancelEditBtn').style.display = 'block';
+            document.getElementById('photo').required = false;
+
+            closeModal();
+            openTab('nuevo-item');
+
+            // Actualizar pestañas
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText === 'Nuevo Item');
+            });
+        }
+
+        function resetForm() {
+            const form = document.getElementById('itemForm');
+            form.reset();
+            document.getElementById('editId').value = '';
+            document.getElementById('currentImageUrl').value = '';
+            document.getElementById('currentStoragePath').value = '';
+            document.getElementById('preview').style.display = 'none';
+            document.getElementById('formTitle').innerText = 'Añadir Nuevo Item';
+            document.getElementById('submitBtn').innerText = 'Guardar';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+            document.getElementById('photo').required = true;
+        }
+
+        function closeModal() {
+            document.getElementById('itemModal').style.display = 'none';
+        }
+
+        // Cerrar modal al hacer clic fuera
+        window.onclick = function (event) {
+            const modal = document.getElementById('itemModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
         const itemForm = document.getElementById('itemForm');
         const photoInput = document.getElementById('photo');
         const previewImg = document.getElementById('preview');
@@ -236,47 +491,72 @@
         itemForm.addEventListener('submit', async function (e) {
             e.preventDefault();
 
+            const editId = document.getElementById('editId').value;
             const name = document.getElementById('name').value;
             const location = document.getElementById('location').value;
             const observations = document.getElementById('observations').value;
             const file = photoInput.files[0];
-            const saveBtn = itemForm.querySelector('button[type="submit"]');
+            const saveBtn = document.getElementById('submitBtn');
 
-            if (!file) {
+            const currentImageUrl = document.getElementById('currentImageUrl').value;
+            const currentStoragePath = document.getElementById('currentStoragePath').value;
+
+            if (!file && !editId) {
                 alert('Por favor, selecciona una foto.');
                 return;
             }
 
             saveBtn.disabled = true;
-            saveBtn.innerText = 'Subiendo...';
+            saveBtn.innerText = editId ? 'Actualizando...' : 'Subiendo...';
 
             try {
-                // Subir a Firebase Storage en la carpeta 'preferencias'
-                const fileName = `preferencias/${Date.now()}_${file.name}`;
-                const storageRef = storage.ref().child(fileName);
-                const snapshot = await storageRef.put(file);
-                const downloadURL = await snapshot.ref.getDownloadURL();
+                let downloadURL = currentImageUrl;
+                let storagePath = currentStoragePath;
 
-                const newItem = {
-                    id: Date.now(),
+                // Si hay un nuevo archivo, subirlo y borrar el anterior si existe
+                if (file) {
+                    // Borrar anterior si estamos editando
+                    if (editId && currentStoragePath) {
+                        try {
+                            await storage.ref().child(currentStoragePath).delete();
+                        } catch (e) { console.warn("No se pudo borrar imagen anterior"); }
+                    }
+
+                    const fileName = `preferencias/${Date.now()}_${file.name}`;
+                    const storageRef = storage.ref().child(fileName);
+                    const snapshot = await storageRef.put(file);
+                    downloadURL = await snapshot.ref.getDownloadURL();
+                    storagePath = fileName;
+                }
+
+                const itemData = {
+                    id: editId ? parseInt(editId) : Date.now(),
                     name: name,
                     location: location,
                     observations: observations,
                     image: downloadURL,
-                    storagePath: fileName
+                    storagePath: storagePath
                 };
 
-                saveItem(newItem);
-                itemForm.reset();
-                previewImg.style.display = 'none';
+                if (editId) {
+                    updateItem(itemData);
+                } else {
+                    saveItem(itemData);
+                }
+
+                resetForm();
                 loadItems();
-                alert('¡Guardado con éxito!');
+                alert(editId ? '¡Actualizado con éxito!' : '¡Guardado con éxito!');
+                openTab('galeria');
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.innerText === 'Galería');
+                });
             } catch (error) {
-                console.error("Error al subir a Firebase:", error);
-                alert('Error al guardar: ' + error.message);
+                console.error("Error al procesar:", error);
+                alert('Error: ' + error.message);
             } finally {
                 saveBtn.disabled = false;
-                saveBtn.innerText = 'Guardar';
+                saveBtn.innerText = editId ? 'Actualizar' : 'Guardar';
             }
         });
 
@@ -286,6 +566,15 @@
             localStorage.setItem('myFavoriteItems', JSON.stringify(items));
         }
 
+        function updateItem(updatedItem) {
+            let items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
+            const index = items.findIndex(i => i.id === updatedItem.id);
+            if (index !== -1) {
+                items[index] = updatedItem;
+                localStorage.setItem('myFavoriteItems', JSON.stringify(items));
+            }
+        }
+
         function loadItems() {
             const items = JSON.parse(localStorage.getItem('myFavoriteItems')) || [];
             itemsGrid.innerHTML = '';
@@ -293,15 +582,16 @@
             items.reverse().forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'card';
+                card.onclick = () => showDetails(item.id);
                 card.innerHTML = `
-                <img src="${item.image}" alt="${item.name}">
-                <div class="card-content">
-                    <h3 class="card-title">${item.name}</h3>
-                    <div class="card-location">📍 <strong>Lugar:</strong> ${item.location}</div>
-                    <div class="card-observations">${item.observations}</div>
-                    <button class="delete-btn" onclick="deleteItem(${item.id})">Eliminar</button>
-                </div>
-            `;
+                    <img src="${item.image}" alt="${item.name}">
+                    <div class="card-content">
+                        <h3 class="card-title">${item.name}</h3>
+                        <div class="card-location">📍 <strong>Lugar:</strong> ${item.location}</div>
+                        <div class="card-observations">${item.observations}</div>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteItem(${item.id})">Eliminar</button>
+                    </div>
+                `;
                 itemsGrid.appendChild(card);
             });
 
