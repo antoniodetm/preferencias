@@ -526,11 +526,12 @@
         // Manejar el envío del formulario
         itemForm.addEventListener('submit', async function (e) {
             e.preventDefault();
+            console.log("Iniciando envío de formulario...");
 
             const editId = document.getElementById('editId').value;
             const name = document.getElementById('name').value;
             const location = document.getElementById('location').value;
-            const observations = document.getElementById('observations').value;
+            const observations = document.getElementById('observations').value || "";
             const file = photoInput.files[0];
             const saveBtn = document.getElementById('submitBtn');
 
@@ -549,20 +550,23 @@
                 let downloadURL = currentImageUrl;
                 let storagePath = currentStoragePath;
 
-                // Si hay un nuevo archivo, subirlo y borrar el anterior si existe
+                // Si hay un nuevo archivo, subirlo
                 if (file) {
-                    // Borrar anterior si estamos editando
-                    if (editId && currentStoragePath) {
-                        try {
-                            await storage.ref().child(currentStoragePath).delete();
-                        } catch (e) { console.warn("No se pudo borrar imagen anterior"); }
-                    }
-
+                    console.log("Subiendo archivo a Storage...");
                     const fileName = `preferencias/${Date.now()}_${file.name}`;
                     const storageRef = storage.ref().child(fileName);
                     const snapshot = await storageRef.put(file);
                     downloadURL = await snapshot.ref.getDownloadURL();
                     storagePath = fileName;
+                    console.log("Archivo subido con éxito:", downloadURL);
+
+                    // Borrar anterior si estamos editando y hay uno nuevo
+                    if (editId && currentStoragePath) {
+                        try {
+                            await storage.ref().child(currentStoragePath).delete();
+                            console.log("Imagen anterior borrada");
+                        } catch (e) { console.warn("No se pudo borrar imagen anterior:", e); }
+                    }
                 }
 
                 const itemData = {
@@ -574,11 +578,13 @@
                     storagePath: storagePath
                 };
 
+                console.log("Guardando datos en Database:", itemData);
                 if (editId) {
                     await updateItem(itemData);
                 } else {
                     await saveItem(itemData);
                 }
+                console.log("Datos guardados con éxito en Database");
 
                 resetForm();
                 alert(editId ? '¡Actualizado con éxito!' : '¡Guardado con éxito!');
@@ -587,8 +593,8 @@
                     btn.classList.toggle('active', btn.innerText === 'Galería');
                 });
             } catch (error) {
-                console.error("Error al procesar:", error);
-                alert('Error: ' + error.message);
+                console.error("Error completo en el proceso:", error);
+                alert('Error al guardar: ' + error.message);
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.innerText = editId ? 'Actualizar' : 'Guardar';
@@ -596,13 +602,25 @@
         });
 
         async function saveItem(item) {
-            await database.ref('items').push(item);
+            try {
+                return await database.ref('items').push(item);
+            } catch (error) {
+                console.error("Error en database.push:", error);
+                throw error;
+            }
         }
 
         async function updateItem(updatedItem) {
-            const item = window.currentItems.find(i => i.id === updatedItem.id);
-            if (item && item.firebaseKey) {
-                await database.ref('items/' + item.firebaseKey).set(updatedItem);
+            try {
+                const item = window.currentItems.find(i => i.id === updatedItem.id);
+                if (item && item.firebaseKey) {
+                    return await database.ref('items/' + item.firebaseKey).set(updatedItem);
+                } else {
+                    throw new Error("No se encontró la referencia en la base de datos para editar");
+                }
+            } catch (error) {
+                console.error("Error en database.set:", error);
+                throw error;
             }
         }
 
