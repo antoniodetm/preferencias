@@ -15,7 +15,7 @@
         const firebaseConfig = {
             apiKey: "AIzaSyCDvgv6A8ugOmfgX9jKiCp_0ccyomxYOk0",
             authDomain: "rutas-e051f.firebaseapp.com",
-            databaseURL: "https://compras-58fd2-default-rtdb.europe-west1.firebasedatabase.app",
+            databaseURL: "https://rutas-e051f-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "rutas-e051f",
             storageBucket: "rutas-e051f.firebasestorage.app",
             messagingSenderId: "263100723365",
@@ -320,8 +320,8 @@
         </header>
 
         <nav class="tabs">
-            <button class="tab-btn active" onclick="openTab('galeria')">Galería</button>
-            <button class="tab-btn" onclick="openTab('nuevo-item')">Nuevo Item</button>
+            <button class="tab-btn active" onclick="openTab('galeria', event)">Galería</button>
+            <button class="tab-btn" onclick="openTab('nuevo-item', event)">Nuevo Item</button>
         </nav>
 
         <section id="nuevo-item" class="tab-content">
@@ -376,7 +376,7 @@
     </div>
 
     <script>
-        function openTab(tabId) {
+        function openTab(tabId, ev) {
             // Ocultar todos los contenidos
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
@@ -385,11 +385,24 @@
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
+
             // Mostrar el contenido seleccionado
-            document.getElementById(tabId).classList.add('active');
+            const targetTab = document.getElementById(tabId);
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+
             // Activar el botón correspondiente
-            if (event && event.currentTarget) {
-                event.currentTarget.classList.add('active');
+            if (ev && ev.currentTarget) {
+                ev.currentTarget.classList.add('active');
+            } else {
+                // Si no hay evento, buscar el botón por texto (para llamadas manuales)
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    if ((tabId === 'galeria' && btn.innerText.includes('Galería')) ||
+                        (tabId === 'nuevo-item' && btn.innerText.includes('Nuevo Item'))) {
+                        btn.classList.add('active');
+                    }
+                });
             }
         }
 
@@ -434,11 +447,6 @@
 
             closeModal();
             openTab('nuevo-item');
-
-            // Actualizar pestañas
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.innerText === 'Nuevo Item');
-            });
         }
 
         function resetForm() {
@@ -547,18 +555,52 @@
             saveBtn.innerText = editId ? 'Actualizando...' : 'Subiendo...';
 
             try {
+                // Verificar si estamos autenticados (necesario para Storage)
+                if (!auth.currentUser) {
+                    console.log("No detectado usuario, esperando autenticación...");
+                    await new Promise((resolve, reject) => {
+                        const unsubscribe = auth.onAuthStateChanged(user => {
+                            unsubscribe();
+                            if (user) resolve(user);
+                            else reject(new Error("No se pudo autenticar al usuario"));
+                        });
+                        // Timeout de 5 segundos
+                        setTimeout(() => reject(new Error("Tiempo de espera agotado para la autenticación")), 5000);
+                    });
+                }
+                console.log("Usuario autenticado:", auth.currentUser.uid);
+
                 let downloadURL = currentImageUrl;
                 let storagePath = currentStoragePath;
 
                 // Si hay un nuevo archivo, subirlo
                 if (file) {
-                    console.log("Subiendo archivo a Storage...");
+                    console.log("Iniciando subida de archivo:", file.name);
                     const fileName = `preferencias/${Date.now()}_${file.name}`;
                     const storageRef = storage.ref().child(fileName);
-                    const snapshot = await storageRef.put(file);
-                    downloadURL = await snapshot.ref.getDownloadURL();
-                    storagePath = fileName;
-                    console.log("Archivo subido con éxito:", downloadURL);
+
+                    // Usar el evento state_changed para monitorear el progreso y detectar errores pronto
+                    const uploadTask = storageRef.put(file);
+
+                    await new Promise((resolve, reject) => {
+                        uploadTask.on('state_changed',
+                            (snapshot) => {
+                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                                saveBtn.innerText = `Subiendo... (${Math.round(progress)}%)`;
+                                console.log('Progreso:', progress + '%');
+                            },
+                            (error) => {
+                                console.error("Error en uploadTask:", error);
+                                reject(error);
+                            },
+                            async () => {
+                                downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                                storagePath = fileName;
+                                console.log("Subida completada. URL:", downloadURL);
+                                resolve();
+                            }
+                        );
+                    });
 
                     // Borrar anterior si estamos editando y hay uno nuevo
                     if (editId && currentStoragePath) {
@@ -589,9 +631,6 @@
                 resetForm();
                 alert(editId ? '¡Actualizado con éxito!' : '¡Guardado con éxito!');
                 openTab('galeria');
-                document.querySelectorAll('.tab-btn').forEach(btn => {
-                    btn.classList.toggle('active', btn.innerText === 'Galería');
-                });
             } catch (error) {
                 console.error("Error completo en el proceso:", error);
                 alert('Error al guardar: ' + error.message);
